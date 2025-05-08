@@ -4,8 +4,12 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	"os"
 	"os/exec"
 	"strings"
+	"time"
+
+	"golang.org/x/term"
 )
 
 const targetWidth = 80
@@ -14,21 +18,21 @@ const targetWidth = 80
 const targetHeight = ((targetWidth / 16 * 9) / 2) * 2
 
 var renderStream = make(chan string)
+var keyboardEvents = make(chan string)
 
-var ffmpegCommands = []string{
-	"-framerate", "60",
-	"-video_size", "320x180",
-	"-input_format", "mjpeg",
-	"-i", "/dev/video0",
-	"-f", "rawvideo",
-	"-vf", fmt.Sprintf("scale=%dx%d,setsar=1:1", targetWidth, targetHeight),
-	"-pix_fmt", "rgb24",
-	"pipe:",
-}
+// RenderMinecraftDirectly renders the Minecraft X11 screen directly to the terminal
+func RenderMinecraftDirectly() {
+	var x11GrabFlags = []string{
+		"-f", "x11grab",
+		"-video_size", "1280x720",
+		"-i", ":44",
+		"-f", "rawvideo",
+		"-vf", fmt.Sprintf("scale=%dx%d,setsar=1:1", targetWidth, targetHeight),
+		"-pix_fmt", "rgb24",
+		"pipe:",
+	}
 
-// RenderWebcam renders the default webcam to the terminal.
-func RenderWebcam() {
-	ffmpegProcess := exec.Command(FfmpegBinary, ffmpegCommands...)
+	ffmpegProcess := exec.Command(FfmpegBinary, x11GrabFlags...)
 
 	stdout, _ := ffmpegProcess.StdoutPipe()
 
@@ -40,32 +44,8 @@ func RenderWebcam() {
 	RenderByteStream(ffmpegStdoutStream, targetHeight, targetWidth, 0, 0)
 }
 
-// This is a temporary hack for testing multiple simultaneous video streams.
-func RenderRTSP() {
-	var rtspFlags = []string{
-		"-rtsp_transport", "udp",
-		"-i", "rtsp://wowzaec2demo.streamlock.net/vod/mp4:BigBuckBunny_115k.mp4",
-		"-f", "rawvideo",
-		"-vf", fmt.Sprintf("scale=%dx%d,setsar=1:1", targetWidth, targetHeight),
-		"-pix_fmt", "rgb24",
-		"pipe:",
-	}
-
-	ffmpegProcess := exec.Command(FfmpegBinary, rtspFlags...)
-
-	stdout, _ := ffmpegProcess.StdoutPipe()
-
-	ffmpegProcess.Start()
-	defer ffmpegProcess.Wait()
-
-	ffmpegStdoutStream := bufio.NewReader(stdout)
-
-	RenderByteStream(ffmpegStdoutStream, targetHeight, targetWidth, 0, 30)
-}
-
 // RenderByteStream renders an arbitrary bytes buffer to the terminal.  It will render it to screen at given x and y offset.
 func RenderByteStream(buffer *bufio.Reader, height, width, offsetX, offsetY uint) {
-
 	// The size of the static buffer for holding raw frame data
 	bufferSize := targetHeight * targetWidth * 3
 
@@ -130,13 +110,123 @@ func DisplayRenderThread() {
 	}
 }
 
+// CaptureKeyboardInput sets up the terminal for raw input and captures keystrokes
+func CaptureKeyboardInput() {
+	// Put terminal into raw mode
+	oldState, err := term.MakeRaw(int(os.Stdin.Fd()))
+	if err != nil {
+		fmt.Println("Failed to set terminal to raw mode:", err)
+		return
+	}
+	defer term.Restore(int(os.Stdin.Fd()), oldState)
+
+	// Buffer for reading individual keystrokes
+	buf := make([]byte, 1)
+	for {
+		_, err := os.Stdin.Read(buf)
+		if err != nil {
+			continue
+		}
+		
+		// Special handling for escape sequences
+		if buf[0] == 27 { // ESC
+			escBuf := make([]byte, 2)
+			_, err := os.Stdin.Read(escBuf)
+			if err == nil {
+				// Handle arrow keys and other special keys
+				if escBuf[0] == 91 { // [
+					keyboardEvents <- fmt.Sprintf("SPECIAL_%c", escBuf[1])
+				}
+			} else {
+				keyboardEvents <- "ESC"
+			}
+		} else {
+			// Regular key
+			keyboardEvents <- string(buf)
+		}
+	}
+}
+
+// SendKeyboardToMinecraft forwards captured keyboard input to the Minecraft instance
+func SendKeyboardToMinecraft() {
+	for {
+		key := <-keyboardEvents
+		var cmd *exec.Cmd
+		
+		// Map keys to xdotool commands
+		switch key {
+		case "w":
+			cmd = exec.Command("xdotool", "key", "--window", "$(xdotool search --class minecraft | head -1)", "w")
+		case "a":
+			cmd = exec.Command("xdotool", "key", "--window", "$(xdotool search --class minecraft | head -1)", "a")
+		case "s":
+			cmd = exec.Command("xdotool", "key", "--window", "$(xdotool search --class minecraft | head -1)", "s")
+		case "d":
+			cmd = exec.Command("xdotool", "key", "--window", "$(xdotool search --class minecraft | head -1)", "d")
+		case " ":
+			cmd = exec.Command("xdotool", "key", "--window", "$(xdotool search --class minecraft | head -1)", "space")
+		case "SPECIAL_A": // Up arrow
+			cmd = exec.Command("xdotool", "key", "--window", "$(xdotool search --class minecraft | head -1)", "Up")
+		case "SPECIAL_B": // Down arrow
+			cmd = exec.Command("xdotool", "key", "--window", "$(xdotool search --class minecraft | head -1)", "Down")
+		case "SPECIAL_C": // Right arrow
+			cmd = exec.Command("xdotool", "key", "--window", "$(xdotool search --class minecraft | head -1)", "Right")
+		case "SPECIAL_D": // Left arrow
+			cmd = exec.Command("xdotool", "key", "--window", "$(xdotool search --class minecraft | head -1)", "Left")
+		case "ESC":
+			cmd = exec.Command("xdotool", "key", "--window", "$(xdotool search --class minecraft | head -1)", "Escape")
+		case "\r":
+			cmd = exec.Command("xdotool", "key", "--window", "$(xdotool search --class minecraft | head -1)", "Return")
+		case "e":
+			cmd = exec.Command("xdotool", "key", "--window", "$(xdotool search --class minecraft | head -1)", "e")
+		case "q":
+			cmd = exec.Command("xdotool", "key", "--window", "$(xdotool search --class minecraft | head -1)", "q")
+		case "1", "2", "3", "4", "5", "6", "7", "8", "9":
+			cmd = exec.Command("xdotool", "key", "--window", "$(xdotool search --class minecraft | head -1)", key)
+		default:
+			// Other keys can be mapped as needed
+			continue
+		}
+		
+		if cmd != nil {
+			cmd.Env = append(os.Environ(), "DISPLAY=:44")
+			cmd.Run()
+		}
+	}
+}
+
+// SendMouseClicksToMinecraft simulates mouse clicks in the Minecraft window
+func SendMouseClicksToMinecraft() {
+	leftClickCmd := exec.Command("xdotool", "mousedown", "--window", "$(xdotool search --class minecraft | head -1)", "1")
+	leftClickCmd.Env = append(os.Environ(), "DISPLAY=:44")
+	rightClickCmd := exec.Command("xdotool", "mousedown", "--window", "$(xdotool search --class minecraft | head -1)", "3")
+	rightClickCmd.Env = append(os.Environ(), "DISPLAY=:44")
+	
+	for {
+		// For future implementation of mouse control
+		time.Sleep(time.Second)
+	}
+}
+
 func main() {
-	go RenderWebcam()
-
 	// Ensure that the terminal has been wiped
-	renderStream <- "\033[H\033[2J"
-
-	RenderRTSP()
+	fmt.Print("\033[H\033[2J")
+	fmt.Println("Terminal Minecraft Viewer")
+	fmt.Println("Loading Minecraft stream...")
+	fmt.Println("Press any key to begin capturing input")
+	
+	// Wait for Minecraft to be ready
+	time.Sleep(5 * time.Second)
+	
+	// Start the keyboard input capture
+	go CaptureKeyboardInput()
+	go SendKeyboardToMinecraft()
+	
+	// Start rendering the Minecraft stream directly
+	go RenderMinecraftDirectly()
+	
+	// Keep the main thread running
+	DisplayRenderThread()
 }
 
 func init() {
