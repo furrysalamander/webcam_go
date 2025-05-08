@@ -7,12 +7,11 @@ import (
 	"os"
 	"os/exec"
 	"strings"
-	"time"
 
 	"golang.org/x/term"
 )
 
-const targetWidth = 80
+const targetWidth = 40
 
 // The height must be a multiple of two.
 const targetHeight = ((targetWidth / 16 * 9) / 2) * 2
@@ -127,7 +126,7 @@ func CaptureKeyboardInput() {
 		if err != nil {
 			continue
 		}
-		
+
 		// Special handling for escape sequences
 		if buf[0] == 27 { // ESC
 			escBuf := make([]byte, 2)
@@ -152,7 +151,7 @@ func SendKeyboardToMinecraft() {
 	for {
 		key := <-keyboardEvents
 		var cmd *exec.Cmd
-		
+
 		// Map keys to xdotool commands
 		switch key {
 		case "w":
@@ -178,19 +177,21 @@ func SendKeyboardToMinecraft() {
 		case "\r":
 			cmd = exec.Command("xdotool", "key", "Return")
 		case "e":
+			cmd = exec.Command("xdotool", "mousemove_relative", "200", "0")
+		case "r":
 			cmd = exec.Command("xdotool", "key", "e")
 		case "q":
-			cmd = exec.Command("xdotool", "key", "q")
+			cmd = exec.Command("xdotool", "mousemove_relative", "-200", "0")
 		case "1", "2", "3", "4", "5", "6", "7", "8", "9":
 			cmd = exec.Command("xdotool", "key", key)
 		case "b":
-			return
+			os.Exit(0)
 		default:
 			SendMouseClicksToMinecraft()
 			// Other keys can be mapped as needed
 			continue
 		}
-		
+
 		if cmd != nil {
 			cmd.Env = append(os.Environ(), "DISPLAY=:44")
 			cmd.Run()
@@ -217,18 +218,14 @@ func main() {
 	fmt.Print("\033[H\033[2J")
 	fmt.Println("Terminal Minecraft Viewer")
 	fmt.Println("Loading Minecraft stream...")
-	fmt.Println("Press any key to begin capturing input")
-	
-	// Wait for Minecraft to be ready
-	time.Sleep(5 * time.Second)
-	
+
 	// Start the keyboard input capture
 	go CaptureKeyboardInput()
 	go SendKeyboardToMinecraft()
-	
+
 	// Start rendering the Minecraft stream directly
 	go RenderMinecraftDirectly()
-	
+
 	// Keep the main thread running
 	DisplayRenderThread()
 }
