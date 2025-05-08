@@ -156,34 +156,37 @@ func SendKeyboardToMinecraft() {
 		// Map keys to xdotool commands
 		switch key {
 		case "w":
-			cmd = exec.Command("xdotool", "key", "--window", "$(xdotool search --class minecraft | head -1)", "w")
+			cmd = exec.Command("xdotool", "key", "w")
 		case "a":
-			cmd = exec.Command("xdotool", "key", "--window", "$(xdotool search --class minecraft | head -1)", "a")
+			cmd = exec.Command("xdotool", "key", "a")
 		case "s":
-			cmd = exec.Command("xdotool", "key", "--window", "$(xdotool search --class minecraft | head -1)", "s")
+			cmd = exec.Command("xdotool", "key", "s")
 		case "d":
-			cmd = exec.Command("xdotool", "key", "--window", "$(xdotool search --class minecraft | head -1)", "d")
+			cmd = exec.Command("xdotool", "key", "d")
 		case " ":
-			cmd = exec.Command("xdotool", "key", "--window", "$(xdotool search --class minecraft | head -1)", "space")
+			cmd = exec.Command("xdotool", "key", "space")
 		case "SPECIAL_A": // Up arrow
-			cmd = exec.Command("xdotool", "key", "--window", "$(xdotool search --class minecraft | head -1)", "Up")
+			cmd = exec.Command("xdotool", "key", "Up")
 		case "SPECIAL_B": // Down arrow
-			cmd = exec.Command("xdotool", "key", "--window", "$(xdotool search --class minecraft | head -1)", "Down")
+			cmd = exec.Command("xdotool", "key", "Down")
 		case "SPECIAL_C": // Right arrow
-			cmd = exec.Command("xdotool", "key", "--window", "$(xdotool search --class minecraft | head -1)", "Right")
+			cmd = exec.Command("xdotool", "key", "Right")
 		case "SPECIAL_D": // Left arrow
-			cmd = exec.Command("xdotool", "key", "--window", "$(xdotool search --class minecraft | head -1)", "Left")
+			cmd = exec.Command("xdotool", "key", "Left")
 		case "ESC":
-			cmd = exec.Command("xdotool", "key", "--window", "$(xdotool search --class minecraft | head -1)", "Escape")
+			cmd = exec.Command("xdotool", "key", "Escape")
 		case "\r":
-			cmd = exec.Command("xdotool", "key", "--window", "$(xdotool search --class minecraft | head -1)", "Return")
+			cmd = exec.Command("xdotool", "key", "Return")
 		case "e":
-			cmd = exec.Command("xdotool", "key", "--window", "$(xdotool search --class minecraft | head -1)", "e")
+			cmd = exec.Command("xdotool", "key", "e")
 		case "q":
-			cmd = exec.Command("xdotool", "key", "--window", "$(xdotool search --class minecraft | head -1)", "q")
+			cmd = exec.Command("xdotool", "key", "q")
 		case "1", "2", "3", "4", "5", "6", "7", "8", "9":
-			cmd = exec.Command("xdotool", "key", "--window", "$(xdotool search --class minecraft | head -1)", key)
+			cmd = exec.Command("xdotool", "key", key)
+		case "b":
+			return
 		default:
+			SendMouseClicksToMinecraft()
 			// Other keys can be mapped as needed
 			continue
 		}
@@ -197,15 +200,16 @@ func SendKeyboardToMinecraft() {
 
 // SendMouseClicksToMinecraft simulates mouse clicks in the Minecraft window
 func SendMouseClicksToMinecraft() {
-	leftClickCmd := exec.Command("xdotool", "mousedown", "--window", "$(xdotool search --class minecraft | head -1)", "1")
+	leftClickCmd := exec.Command("xdotool", "click", "1")
 	leftClickCmd.Env = append(os.Environ(), "DISPLAY=:44")
-	rightClickCmd := exec.Command("xdotool", "mousedown", "--window", "$(xdotool search --class minecraft | head -1)", "3")
-	rightClickCmd.Env = append(os.Environ(), "DISPLAY=:44")
-	
-	for {
-		// For future implementation of mouse control
-		time.Sleep(time.Second)
-	}
+	leftClickCmd.Run()
+
+	// rightClickCmd := exec.Command("xdotool", "mousedown", "--window", "$(xdotool search --class minecraft | head -1)", "3")
+	// rightClickCmd.Env = append(os.Environ(), "DISPLAY=:44")
+	// for {
+	// 	// For future implementation of mouse control
+	// 	time.Sleep(time.Second)
+	// }
 }
 
 func main() {
