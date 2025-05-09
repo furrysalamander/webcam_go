@@ -11,7 +11,7 @@ import (
 	"golang.org/x/term"
 )
 
-const targetWidth = 40
+const targetWidth = 120
 
 // The height must be a multiple of two.
 const targetHeight = ((targetWidth / 16 * 9) / 2) * 2
@@ -24,7 +24,7 @@ func RenderMinecraftDirectly() {
 	var x11GrabFlags = []string{
 		"-f", "x11grab",
 		"-video_size", "1280x720",
-		"-i", ":44",
+		"-i", ":1",
 		"-f", "rawvideo",
 		"-vf", fmt.Sprintf("scale=%dx%d,setsar=1:1", targetWidth, targetHeight),
 		"-pix_fmt", "rgb24",
@@ -181,11 +181,15 @@ func SendKeyboardToMinecraft() {
 		case "r":
 			cmd = exec.Command("xdotool", "key", "e")
 		case "q":
-			cmd = exec.Command("xdotool", "mousemove_relative", "-200", "0")
+			cmd = exec.Command("xdotool", "mousemove_relative", "--", "-200", "0")
 		case "1", "2", "3", "4", "5", "6", "7", "8", "9":
 			cmd = exec.Command("xdotool", "key", key)
 		case "b":
 			os.Exit(0)
+		case "t":
+			cmd = exec.Command("xdotool", "mouseup", "1")
+		case "g":
+			cmd = exec.Command("xdotool", "mousedown", "1")
 		default:
 			SendMouseClicksToMinecraft()
 			// Other keys can be mapped as needed
@@ -193,7 +197,7 @@ func SendKeyboardToMinecraft() {
 		}
 
 		if cmd != nil {
-			cmd.Env = append(os.Environ(), "DISPLAY=:44")
+			cmd.Env = append(os.Environ(), "DISPLAY=:1")
 			cmd.Run()
 		}
 	}
@@ -202,7 +206,7 @@ func SendKeyboardToMinecraft() {
 // SendMouseClicksToMinecraft simulates mouse clicks in the Minecraft window
 func SendMouseClicksToMinecraft() {
 	leftClickCmd := exec.Command("xdotool", "click", "1")
-	leftClickCmd.Env = append(os.Environ(), "DISPLAY=:44")
+	leftClickCmd.Env = append(os.Environ(), "DISPLAY=:1")
 	leftClickCmd.Run()
 
 	// rightClickCmd := exec.Command("xdotool", "mousedown", "--window", "$(xdotool search --class minecraft | head -1)", "3")
